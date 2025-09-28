@@ -8,7 +8,7 @@ echo ">>> Updating system..."
 sudo pacman -Syu --noconfirm
 
 echo ">>> Installing basics..."
-sudo pacman -S --noconfirm base-devel git curl wget unzip zip htop btop neofetch feh picom dunst pamixer
+sudo pacman -S --noconfirm base-devel git curl wget unzip zip htop btop fastfetch feh picom dunst pamixer
 
 # Structured dirs
 mkdir -p ~/.local/src ~/.local/bin ~/.local/share/dwm
