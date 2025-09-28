@@ -129,7 +129,11 @@ sudo make install 2>/dev/null || cp dwm ~/.local/bin/
 
 echo ">>> Fonts + themes..."
 sudo pacman -S --noconfirm ttf-jetbrains-mono-nerd ttf-dejavu woff2-font-awesome
-yay -S --noconfirm --noconfirm catppuccin-gtk-theme catppuccin-cursors-mocha tokyonight-gtk-theme
+# Install cursor themes from official repos instead of problematic AUR package
+sudo pacman -S --noconfirm adwaita-icon-theme gnome-themes-extra
+# Try catppuccin themes but continue if they fail
+yay -S --noconfirm catppuccin-gtk-theme-mocha || echo "Catppuccin GTK theme installation failed, continuing..."
+yay -S --noconfirm tokyonight-gtk-theme || echo "Tokyo Night theme installation failed, continuing..."
 
 # Fix font cache
 sudo fc-cache -fv
