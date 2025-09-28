@@ -149,8 +149,11 @@ mkdir -p ~/.local/share/nvim/site/pack/lazy/start
   git clone https://github.com/folke/lazy.nvim ~/.local/share/nvim/site/pack/lazy/start/lazy.nvim
 
 echo ">>> Laptop utilities..."
+# Remove pulseaudio if present to avoid conflicts
+sudo pacman -Rs --noconfirm pulseaudio pulseaudio-alsa 2>/dev/null || true
+
 sudo pacman -S --noconfirm networkmanager nm-connection-editor bluez bluez-utils blueman \
-  tlp tlp-rdw powertop acpi acpid brightnessctl pipewire pipewire-alsa pipewire-pulse pipewire-jack wireplumber pavucontrol xf86-input-synaptics
+  tlp tlp-rdw powertop acpi acpid brightnessctl pipewire pipewire-alsa pipewire-pulse pipewire-jack wireplumber pavucontrol
 
 sudo systemctl enable NetworkManager
 sudo systemctl enable bluetooth
@@ -159,6 +162,14 @@ sudo systemctl enable tlp acpid
 echo ">>> Study apps..."
 yay -S --noconfirm --noconfirm obsidian
 sudo pacman -S --noconfirm zathura zathura-pdf-mupdf libreoffice-fresh flameshot firefox
+
+echo ">>> Enabling multilib for Steam..."
+# Enable multilib if not already enabled
+if ! grep -q "^\[multilib\]" /etc/pacman.conf; then
+    echo "Enabling multilib repository..."
+    echo -e "\n[multilib]\nInclude = /etc/pacman.d/mirrorlist" | sudo tee -a /etc/pacman.conf
+    sudo pacman -Sy
+fi
 
 echo ">>> Gaming..."
 sudo pacman -S --noconfirm steam lutris mangohud gamemode
