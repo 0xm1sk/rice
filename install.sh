@@ -7,16 +7,26 @@ set -e
 echo ">>> Updating system..."
 sudo pacman -Syu --noconfirm
 
+echo ">>> Installing yay (AUR helper)..."
+sudo pacman -S --noconfirm base-devel git
+if ! command -v yay &> /dev/null; then
+    cd /tmp
+    git clone https://aur.archlinux.org/yay-bin.git
+    cd yay-bin
+    makepkg -si --noconfirm
+    cd ~
+fi
+
 echo ">>> Installing basics..."
-sudo pacman -S --noconfirm base-devel git curl wget unzip zip htop btop fastfetch feh picom dunst pamixer
+sudo pacman -S --noconfirm curl wget unzip zip htop btop fastfetch feh picom dunst pamixer
 
 # Structured dirs
-mkdir -p ~/.local/src ~/.local/bin ~/.local/share/dwm
+mkdir -p ~/.local/src ~/.local/bin ~/.local/share/dwm ~/Pictures/wallpapers
 
 # Add ~/.local/bin to PATH
 for file in ~/.zshrc ~/.bashrc; do
-  if ! grep -q 'export PATH=$HOME/.local/bin:$PATH' $file 2>/dev/null; then
-    echo 'export PATH=$HOME/.local/bin:$PATH' >> $file
+  if [ -f "$file" ] && ! grep -q 'export PATH=$HOME/.local/bin:$PATH' "$file" 2>/dev/null; then
+    echo 'export PATH=$HOME/.local/bin:$PATH' >> "$file"
   fi
 done
 
@@ -26,7 +36,7 @@ sudo pacman -S --noconfirm xorg xorg-xinit xorg-xrandr xorg-xsetroot
 echo ">>> Cloning suckless tools..."
 cd ~/.local/src
 for repo in dwm st dmenu slock; do
-  [ ! -d $repo ] && git clone https://git.suckless.org/$repo
+  [ ! -d "$repo" ] && git clone "https://git.suckless.org/$repo"
 done
 [ ! -d dwmblocks ] && git clone https://github.com/torrinfail/dwmblocks
 
@@ -35,7 +45,7 @@ for repo in dwm st dmenu slock dwmblocks; do
   cd ~/.local/src/$repo
   make clean
   make
-  cp $repo ~/.local/bin/ 2>/dev/null || true
+  sudo make install 2>/dev/null || cp $repo ~/.local/bin/ 2>/dev/null || true
 done
 
 echo ">>> DWM Help popup..."
@@ -69,6 +79,9 @@ chmod +x ~/.local/bin/dwm-help.sh
 echo ">>> Patching dwm config..."
 CONFIG=~/.local/src/dwm/config.h
 if [ -f "$CONFIG" ]; then
+  # Create backup
+  cp "$CONFIG" "$CONFIG.backup"
+  
   # Patch rules
   if ! grep -q 'DwmHelp' "$CONFIG"; then
     sed -i '/static const Rule rules\[\] = {/a\
@@ -80,47 +93,52 @@ if [ -f "$CONFIG" ]; then
   fi
 
   # Patch keybinds
-  sed -i '/static Key keys\[\] = {/a\
-    { MODKEY,                       XK_space,  spawn, SHCMD("dmenu_run") },\
-    { MODKEY,                       XK_h,      spawn, SHCMD("~/.local/bin/dwm-help.sh") },\
-    { MODKEY,                       XK_q,      spawn, SHCMD("pkill -f DwmHelp") },\
-    { MODKEY|ShiftMask,             XK_s,      spawn, SHCMD("flameshot gui") },\
-    { MODKEY,                       XK_ampersand, view, {.ui = 1 << 0} },\
-    { MODKEY,                       XK_eacute,    view, {.ui = 1 << 1} },\
-    { MODKEY,                       XK_quotedbl,  view, {.ui = 1 << 2} },\
-    { MODKEY,                       XK_apostrophe,view, {.ui = 1 << 3} },\
-    { MODKEY,                       XK_parenleft, view, {.ui = 1 << 4} },\
-    { MODKEY,                       XK_minus,     view, {.ui = 1 << 5} },\
-    { MODKEY,                       XK_egrave,    view, {.ui = 1 << 6} },\
-    { MODKEY,                       XK_underscore,view, {.ui = 1 << 7} },\
-    { MODKEY,                       XK_ccedilla,  view, {.ui = 1 << 8} },\
-    { MODKEY,                       XK_agrave,    view, {.ui = 1 << 9} },\
-    { MODKEY|ShiftMask,             XK_ampersand, tag, {.ui = 1 << 0} },\
-    { MODKEY|ShiftMask,             XK_eacute,    tag, {.ui = 1 << 1} },\
-    { MODKEY|ShiftMask,             XK_quotedbl,  tag, {.ui = 1 << 2} },\
-    { MODKEY|ShiftMask,             XK_apostrophe,tag, {.ui = 1 << 3} },\
-    { MODKEY|ShiftMask,             XK_parenleft, tag, {.ui = 1 << 4} },\
-    { MODKEY|ShiftMask,             XK_minus,     tag, {.ui = 1 << 5} },\
-    { MODKEY|ShiftMask,             XK_egrave,    tag, {.ui = 1 << 6} },\
-    { MODKEY|ShiftMask,             XK_underscore,tag, {.ui = 1 << 7} },\
-    { MODKEY|ShiftMask,             XK_ccedilla,  tag, {.ui = 1 << 8} },\
-    { MODKEY|ShiftMask,             XK_agrave,    tag, {.ui = 1 << 9} },' "$CONFIG"
+  if ! grep -q 'XK_h.*spawn.*dwm-help' "$CONFIG"; then
+    sed -i '/static Key keys\[\] = {/a\
+    { MODKEY,                       XK_space,  spawn,          {.v = (const char*[]){ "dmenu_run", NULL } } },\
+    { MODKEY,                       XK_h,      spawn,          {.v = (const char*[]){ "dwm-help.sh", NULL } } },\
+    { MODKEY,                       XK_q,      spawn,          {.v = (const char*[]){ "pkill", "-f", "DwmHelp", NULL } } },\
+    { MODKEY|ShiftMask,             XK_s,      spawn,          {.v = (const char*[]){ "flameshot", "gui", NULL } } },\
+    { MODKEY,                       XK_ampersand, view,        {.ui = 1 << 0} },\
+    { MODKEY,                       XK_eacute,    view,        {.ui = 1 << 1} },\
+    { MODKEY,                       XK_quotedbl,  view,        {.ui = 1 << 2} },\
+    { MODKEY,                       XK_apostrophe,view,        {.ui = 1 << 3} },\
+    { MODKEY,                       XK_parenleft, view,        {.ui = 1 << 4} },\
+    { MODKEY,                       XK_minus,     view,        {.ui = 1 << 5} },\
+    { MODKEY,                       XK_egrave,    view,        {.ui = 1 << 6} },\
+    { MODKEY,                       XK_underscore,view,        {.ui = 1 << 7} },\
+    { MODKEY,                       XK_ccedilla,  view,        {.ui = 1 << 8} },\
+    { MODKEY,                       XK_agrave,    view,        {.ui = 1 << 9} },\
+    { MODKEY|ShiftMask,             XK_ampersand, tag,         {.ui = 1 << 0} },\
+    { MODKEY|ShiftMask,             XK_eacute,    tag,         {.ui = 1 << 1} },\
+    { MODKEY|ShiftMask,             XK_quotedbl,  tag,         {.ui = 1 << 2} },\
+    { MODKEY|ShiftMask,             XK_apostrophe,tag,         {.ui = 1 << 3} },\
+    { MODKEY|ShiftMask,             XK_parenleft, tag,         {.ui = 1 << 4} },\
+    { MODKEY|ShiftMask,             XK_minus,     tag,         {.ui = 1 << 5} },\
+    { MODKEY|ShiftMask,             XK_egrave,    tag,         {.ui = 1 << 6} },\
+    { MODKEY|ShiftMask,             XK_underscore,tag,         {.ui = 1 << 7} },\
+    { MODKEY|ShiftMask,             XK_ccedilla,  tag,         {.ui = 1 << 8} },\
+    { MODKEY|ShiftMask,             XK_agrave,    tag,         {.ui = 1 << 9} },' "$CONFIG"
+  fi
 fi
 
 # Rebuild dwm
 cd ~/.local/src/dwm
 make clean && make
-cp dwm ~/.local/bin/
+sudo make install 2>/dev/null || cp dwm ~/.local/bin/
 
 echo ">>> Fonts + themes..."
-sudo pacman -S --noconfirm ttf-jetbrains-mono-nerd ttf-dejavu ttf-font-awesome
-yay -S --noconfirm catppuccin-gtk-theme catppuccin-cursors-mocha tokyonight-gtk-theme
+sudo pacman -S --noconfirm ttf-jetbrains-mono-nerd ttf-dejavu woff2-font-awesome
+yay -S --noconfirm --noconfirm catppuccin-gtk-theme catppuccin-cursors-mocha tokyonight-gtk-theme
+
+# Fix font cache
+sudo fc-cache -fv
 
 echo ">>> Terminal + shell..."
 sudo pacman -S --noconfirm kitty alacritty zsh zsh-completions
 chsh -s /bin/zsh
 if [ ! -d ~/.oh-my-zsh ]; then
-  sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+  sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 fi
 
 echo ">>> tmux + Neovim..."
@@ -139,12 +157,12 @@ sudo systemctl enable bluetooth
 sudo systemctl enable tlp acpid
 
 echo ">>> Study apps..."
-yay -S --noconfirm obsidian
+yay -S --noconfirm --noconfirm obsidian
 sudo pacman -S --noconfirm zathura zathura-pdf-mupdf libreoffice-fresh flameshot firefox
 
 echo ">>> Gaming..."
 sudo pacman -S --noconfirm steam lutris mangohud gamemode
-yay -S --noconfirm proton-ge-custom prismlauncher
+yay -S --noconfirm --noconfirm proton-ge-custom prismlauncher
 
 echo ">>> Virtualization..."
 sudo pacman -S --noconfirm virtualbox virtualbox-host-modules-arch virtualbox-guest-iso \
@@ -153,8 +171,8 @@ sudo systemctl enable libvirtd
 sudo usermod -aG libvirt $(whoami)
 
 echo ">>> Login manager + lockscreen..."
-sudo pacman -S --noconfirm sddm i3lock-color
-yay -S --noconfirm sddm-theme-catppuccin
+sudo pacman -S --noconfirm sddm
+yay -S --noconfirm --noconfirm sddm-theme-catppuccin
 sudo systemctl enable sddm
 
 echo ">>> dwmblocks modules..."
@@ -188,4 +206,11 @@ exec dwm
 EOF
 chmod +x ~/.xinitrc
 
+echo ">>> Downloading sample wallpaper..."
+mkdir -p ~/Pictures/wallpapers
+if [ ! -f ~/Pictures/wallpapers/dark.jpg ]; then
+    curl -s -o ~/Pictures/wallpapers/dark.jpg "https://picsum.photos/1920/1080" || echo "Wallpaper download failed, please add your own later"
+fi
+
 echo ">>> ✅ Setup complete! Reboot and enjoy Arch + DWM with your custom workflow."
+echo ">>> Note: You may need to manually configure some applications and download your preferred wallpaper."
